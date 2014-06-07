@@ -161,7 +161,7 @@ verbose = FALSE, autoplay = FALSE, title = "La France du crime",
 single.opts = "'width': 600")
 
 
-# create.gif.animation, echo=FALSE
+# create.video.animation, echo=FALSE
 france.map <- as.data.table(map_data('france', project="albers", par = c(39, 45))) %>%
   group_by(region) %>%
   mutate(DEPARTMENT = ifelse(!is.na(match(region, dep.names)), 
@@ -190,11 +190,6 @@ saveVideo({
   png(sprintf(ani.options('img.fmt'), 0), width = 600, height = 600, bg = "#F0F0F0")
   print(title.frame)
   dev.off() 
-  
-  ggplot() +
-    ggtitle("test")
-  
-  
   
   for (i in 1:length(offense.id)) {
     tmp <- filter(off.data, OFFENSE.ID == offense.id[i]) %>%
@@ -246,6 +241,6 @@ saveVideo({
     dev.off()    
   }
 }, img.name = "graph", imgdir = "animation", htmlfile = "animation.html", 
-outdir = getwd(), use.dev = FALSE, interval = 2, other.opts = "-f mp4 -vcodec libx264 -pix_fmt yuv420p")
+outdir = getwd(), use.dev = FALSE, interval = 2, other.opts = "-c:v libx264 -preset slow -crf 18 -c:a copy -pix_fmt yuv420p")
 
 
