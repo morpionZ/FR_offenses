@@ -89,7 +89,7 @@ if (file.exists("data/combined.csv")) {
     ungroup() %>%
     mutate(POPULATION = as.numeric(as.character(Population.totale))) %>%
     select(DEPARTMENT, POPULATION)
-    
+  
   off.data <- merge(off.data, pop, by = "DEPARTMENT")
   
   write.csv(off.data, "data/combined.csv", row.names = FALSE)
@@ -159,5 +159,93 @@ saveHTML({
 outdir = getwd(), autobrowse = FALSE, use.dev = FALSE, interval = 2,
 verbose = FALSE, autoplay = FALSE, title = "La France du crime",
 single.opts = "'width': 600")
+
+
+# create.gif.animation, echo=FALSE
+france.map <- as.data.table(map_data('france', project="albers", par = c(39, 45))) %>%
+  group_by(region) %>%
+  mutate(DEPARTMENT = ifelse(!is.na(match(region, dep.names)), 
+                             dep.names[match(region, dep.names)],
+                             dep.names[which.min(adist(region, dep.names))]))
+
+offense.id <- unique(off.data$OFFENSE.ID)
+
+saveVideo({
+  title.frame <- ggplot(data = data.frame(x = 0, y = 0), 
+                        aes(x = x, 
+                            y = y)) + 
+    theme_minimal() + 
+    theme(line = element_blank(), 
+          text = element_blank(), 
+          title = element_blank(), 
+          plot.margin = unit(c(0,0, -1, -1), "lines"),
+          panel.background = element_rect(fill = "grey40", 
+                                          color = "grey40")) + 
+    coord_cartesian(xlim = c(-1, 1)) + 
+    annotate("text", x = 0, y = 0, 
+             label = "Distribution spatiale des infractions\nconstatées par la police et la gendarmerie\nen France métropolitaine en 2013", 
+             color = "white", hjust = 0.5, size = 8, 
+             family = "Open Sans")
+  
+  png(sprintf(ani.options('img.fmt'), 0), width = 600, height = 600, bg = "#F0F0F0")
+  print(title.frame)
+  dev.off() 
+  
+  ggplot() +
+    ggtitle("test")
+  
+  
+  
+  for (i in 1:length(offense.id)) {
+    tmp <- filter(off.data, OFFENSE.ID == offense.id[i]) %>%
+      group_by(DEPARTMENT) %>%
+      summarize(PERCAP = (sum(COUNT) / POPULATION[1]) * 100000) %>%
+      ungroup() %>%
+      merge(france.map, by = "DEPARTMENT")
+    
+    ti <- as.character(filter(off.data, OFFENSE.ID == offense.id[i])$OFFENSE.NAME[1])
+    ti.words <- strsplit(ti, " ")[[1]]
+    if (length(ti.words) > 8) {
+      tmp1 <- paste(ti.words[1:6], collapse = " ")
+      tmp2 <- paste(ti.words[7:length(ti.words)], collapse = " ")
+      ti <- paste0(tmp1, "\n", tmp2)
+    } else {
+      ti <- paste0(ti, "\n")
+    }
+    
+    g <- ggplot() +
+      geom_polygon(data = tmp, 
+                   aes(x = long, y = lat, group = group, fill = PERCAP),
+                   color = "white") + 
+      coord_fixed() +
+      theme_graphzoo(base_size = 18, family = "Open Sans") +
+      theme(axis.line = element_blank(), 
+            axis.text.x = element_blank(), 
+            axis.text.y = element_blank(),
+            axis.ticks = element_blank(), 
+            axis.title.x = element_blank(),
+            axis.title.y = element_blank(),
+            panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            plot.margin = unit(c(1, 0, 0, -1), "lines"),
+            legend.position = "bottom",
+            legend.title.align = 0.5) +
+      scale_fill_gradient(low = "dodgerblue", high = "red",
+                          guide = guide_colorbar(title = element_text("Nombre d'infractions pour 100 000 habitants en 2013", hjust = 1),
+                                                 label.position = "bottom",
+                                                 title.position = "top",
+                                                 barwidth = 25)) +
+      ggtitle(ti)
+    
+    g <- addBanner(g, font.size = 5,
+                   l.txt = "GRAPHZOO.TUMBLR.COM", 
+                   r.txt = "SOURCE: DATA.GOUV.FR, INSEE")
+    
+    png(sprintf(ani.options('img.fmt'), i), width = 600, height = 600, bg = "#F0F0F0")
+    print(g)
+    dev.off()    
+  }
+}, img.name = "graph", imgdir = "animation", htmlfile = "animation.html", 
+outdir = getwd(), use.dev = FALSE, interval = 2, other.opts = "-f mp4 -vcodec libx264 -pix_fmt yuv420p")
 
 
